@@ -1,43 +1,3 @@
-// import { io } from 'socket.io-client';
-
-// class SocketioService {
-//   socket;
-//   constructor() {}
-
-//   setupSocketConnection(token) {
-//     this.socket = io(process.env.VUE_APP_SOCKET_ENDPOINT, {
-//       auth: {
-//         token,
-//       },
-//     });
-//     console.log(`Connecting socket...`);
-    
-//     this.socket.on('my broadcast', (data) => {
-//       console.log(data);
-//     });
-//   }
-
-//   subscribeToMessages(cb) {
-//     if (!this.socket) return(true);
-//     this.socket.on('message', msg => {
-//       console.log('Room event received!');
-//       return cb(null, msg);
-//     });
-//   }
-  
-//   sendMessage({message, roomName}, cb) {
-//     if (this.socket) this.socket.emit('message', { message, roomName }, cb);
-//   }
-  
-//   disconnect() {
-//     if(this.socket) {
-//       this.socket.disconnect();
-//     }
-//   }
-// }
-
-// export default new SocketioService();
-
 import { io } from 'socket.io-client';
 
 class SocketioService {
@@ -50,9 +10,10 @@ class SocketioService {
       // auth: {
       //   token,
       // },
+      // preRoom: (localStorage.getItem("chatRoom"))?localStorage.getItem("chatRoom"):""
     });
     console.log(`Connecting socket...`, token);
-    
+
     this.socket.on('my broadcast', (data) => {
       console.log(data);
     });
@@ -77,6 +38,13 @@ class SocketioService {
     this.socket.on("statusRoom", message => {
       return cb(null, {message, name: "Bot"});
     })
+  }
+
+  nextRoom(){
+    console.log(localStorage.getItem("chatRoom"))
+    if(localStorage.getItem("chatRoom")){
+      this.socket.emit("nextRoom",localStorage.getItem("chatRoom"));
+    }
   }
   
   // sendMessage({message, roomName}, cb) {

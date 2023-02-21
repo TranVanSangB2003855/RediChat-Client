@@ -1,106 +1,14 @@
-<!-- <template>
-  <div class="App">
-    <form @submit.prevent="submitToken">
-      <input type="text" placeholder="Enter token" v-model="token" />
-      <button type="submit">Submit</button>
-    </form>
-    <div class="box">
-      <div class="messages">
-        <div v-for="user in messages" :key="user.id">
-          {{user.name}}: {{user.message}}
-        </div>
-      </div>
-      <div class="messages"></div>
-      <form class="input-div" @submit.prevent="submitMessage">
-        <input type="text" placeholder="Type in text" v-model="inputMessageText" />
-        <button type="submit">Submit</button>
-      </form>
-    </div>
-  </div>
-</template>
-
-<script>
-import SocketioService from './services/socketio.service.js';
-
-// static data only for demo purposes, in real world scenario, this would be already stored on client
-const SENDER = {
-  id: "123",
-  name: "John Doe",
-};
-
-export default {
-  name: 'App',
-  components: {
-  },
-  data() {
-    return {
-      token: '',
-      inputMessageText: '',
-      messages: []
-    };
-  },
-  methods: {
-    submitToken() {
-      console.log(this.token);
-      SocketioService.setupSocketConnection(this.token);
-      SocketioService.subscribeToMessages((err, data) => {
-        console.log(data);
-        this.messages.push(data);
-      });
-    },
-    submitMessage() {
-      const CHAT_ROOM = "myRandomChatRoomId";
-      const message = this.inputMessageText;
-      SocketioService.sendMessage({message, roomName: CHAT_ROOM}, cb => {
-        // callback is acknowledgement from server
-        console.log(cb);
-        this.messages.push({
-          message,
-          ...SENDER
-        });
-        // clear the input after the message is sent
-        this.inputMessageText = '';
-      });
-    }
-  },
-  beforeUnmount() {
-    SocketioService.disconnect();
-  }
-}
-</script>
-
-<style>
-.App {
-  padding: 1rem;
-}
-
-.box {
-  width: fit-content;
-  height: 400px;
-  border: solid 1px #000;
-  display: flex;
-  flex-direction: column;
-  margin-top: 1rem;
-}
-
-.messages {
-  flex-grow: 1;
-}
-
-.input-div {
-  display: flex;
-  width: 100%;
-}
-</style> -->
-
 <template>
   <div class="App">
-    <form @submit.prevent="submitToken">
-      <!-- <input type="text" placeholder="Enter token" v-model="token" /> -->
-      <button type="submit">Chat với người lạ nào !</button>
-    </form>
-    <button @click="stopChat()">Stop</button>
-    <button @click="nextRoom()">Next</button>
+    <div style="display: flex; flex-direction: row; justify-content: start;">
+      <form @submit.prevent="submitToken">
+        <!-- <input type="text" placeholder="Enter token" v-model="token" /> -->
+        <button type="submit">Chat với người lạ nào !</button>
+      </form>
+      <button @click="stopChat()" v-show="stop">Stop</button>
+      <button @click="nextRoom()" v-show="next">Next</button>
+
+    </div>
     <div class="box">
       <div class="messages">
         <template v-for="user in messages" :key="user.id">
@@ -124,28 +32,24 @@ export default {
 <script>
 import SocketioService from './services/socketio.service.js';
 
-// static data only for demo purposes, in real world scenario, this would be already stored on client
-// const SENDER = {
-//   id: "123",
-//   name: "John Doe",
-// };
-
 export default {
   name: 'App',
   components: {
   },
   mounted() {
-    this.toggleFormElements("form.input-div",true);
+    this.toggleFormElements("form.input-div", true);
   },
   data() {
     return {
       token: '',
       inputMessageText: '',
       messages: [],
+      stop: false,
+      next: false
     };
   },
   methods: {
-    toggleFormElements(formSelected,bDisabled) {
+    toggleFormElements(formSelected, bDisabled) {
       let form = document.querySelector(formSelected);
       let inputs = form.getElementsByTagName("input");
       for (let i = 0; i < inputs.length; i++) {
@@ -169,14 +73,24 @@ export default {
       SocketioService.setupSocketConnection(this.token);
       SocketioService.statusRoom((err, data) => {
         console.log(data);
-        if (this.messages.length > 0) {
+        if (data.message.includes("NextRoom")) {
+          data.message = data.message.substr(8, data.message.length - 1);
+          this.stop = false; this.next = false;
+          this.toggleFormElements("form.input-div", true);
+        }
+        else if (this.messages.length > 0) {
           this.messages = [];
         }
-        if(data.message === 'Strangers have entered the room'){
-          this.toggleFormElements("form.input-div",false);
+        if (data.message.includes("Strangers have entered the room")) {
+          const chatRoom = data.message.substr(data.message.indexOf("|") + 1, data.message.length - 1);
+          localStorage.setItem('chatRoom', chatRoom);
+          data.message = data.message.substr(0, data.message.indexOf("|"));
+          this.toggleFormElements("form.input-div", false);
+          this.stop = true; this.next = true;
         }
-        if(data.message === 'The stranger has escaped. Waiting for the next one ....'){
-          this.toggleFormElements("form.input-div",true);
+        if (data.message === 'The stranger has escaped. Waiting for the next one ....') {
+          this.stop = false; this.next = false;
+          this.toggleFormElements("form.input-div", true);
         }
         this.messages.push(data);
       });
@@ -186,7 +100,6 @@ export default {
       });
     },
     submitMessage() {
-      // const CHAT_ROOM = "myRandomChatRoomId";
       console.log("sending message....");
       const message = this.inputMessageText;
       SocketioService.sendMessage(message, cb => {
@@ -206,21 +119,25 @@ export default {
         message: "You left room !",
         name: "Bot"
       });
-      this.toggleFormElements("form.input-div",true);
+      this.toggleFormElements("form.input-div", true);
+      localStorage.clear();
       // clear the input after the message is sent
+          this.stop = false; this.next = false;
       this.inputMessageText = '';
-      
+
     },
     nextRoom() {
-      SocketioService.disconnect();
-      this.messages = [];
-      this.submitToken();
+      // SocketioService.disconnect();
+      this.messages = [{ message: "Waiting for a stranger ...", name: "Bot" }];
+          this.stop = false; this.next = false;
+      // this.submitToken();
+      SocketioService.nextRoom();
     }
   },
   beforeUnmount() {
     SocketioService.disconnect();
   }
-  
+
 }
 </script>
 
@@ -249,38 +166,3 @@ export default {
   width: 100%;
 }
 </style>
-
-
-
-
-<!-- <template>
-  <img alt="Vue logo" src="./assets/logo.png">
-</template>
-
-<script>
-import SocketioService from './services/socketio.service.js';
-
-export default {
-  name: 'App',
-  components: {
-  },
-  created() {
-    SocketioService.setupSocketConnection();
-  },
-  beforeUnmount() {
-    SocketioService.disconnect();
-  }
-}
-</script>
-
-<style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
-}
-</style> -->
-
